@@ -10,11 +10,11 @@
 
 100" ; testing: print a '*'
 110" ;org $c000
-115" asl a
-116" bne test
-120" lda # 42 ;a<-'*'
-130" jsr $ffd2
-140" rts 
+115" test   asl a
+116"        lda test,x
+120"        lda # 42 ;a<-'*'
+130" test2  jsr $ffd2
+140"; test3  rts 
 150" end.
 
 3999 rem ******************************************
@@ -29,7 +29,8 @@
 4100 rem *** settings ***
 4120 ea=2384:rem editor address of first quote in editor
 4130 nm=56:rem number of (pseudo)mnemonics
-4140 mm=13: rem number of memory modes
+4140 mm=13:rem number of memory modes
+4150 ls=2:rem number of labels
 4290 rem *** end of settings ***
 
 4299 rem ---------- main ----------
@@ -54,17 +55,16 @@
 5460 print:print:print "error: ";er$
 5470 stop
 
-
-
 5500 rem *** initialisation ***
 5510 print "initialising...":print
 5515 if peek(ea)<>34 then er$="first quote not on expected address":goto 5450
-5520 dim mn$(nm-1),ta(nm-1,mm-1):rem list of mnemonics
+5520 dim mn$(nm-1),ta(nm-1,mm-1):rem list of mnemonics, table of instructions
 5530 for r=0 to nm-1:
 5550 read mn$(r)
 5560 for k=0 to mm-1:read ta(r,k):next k
 5570 next r
-5580 return
+5580 dim la$(ls-1),la(ls-1):lp=0:rem labels and labelpointer
+5590 return
 
 5600 rem *** getch ***
 5610 ea=ea+1:ch=peek(ea):rem get lookahead character
@@ -133,6 +133,8 @@
 
 6300 rem *** labeldef ***
 6310 print "labeldef found: ";name$
+6312 if lp>=ls then er$="max labels exceeded":goto 5450
+6315 la$(lp)=name$:la(lp)=138:lp=lp+1
 6320 gosub 5800:rem getsym
 6330 if sy$=":" then gosub 5800:rem getsym
 6340 return
@@ -170,14 +172,14 @@
 6810 mm$="indirect":print mm$;
 6820 gosub 5800:rem getsym
 6830 gosub 7000:print num:rem value
-6840 if sy$="," then 6900:rem indirectx
+6840 if sy$="," then 6910:rem indirectx
 6850 ex$=")":gosub 5400:rem expect )
 6860 if sy$ <> "," then return
-6870 mm$="indirecty":print mm$;
+6870 mm$="indirecty":print mm$
 6880 gosub 5800:rem getsym 
 6890 ex$="y":gosub 5400:rem expect y
 6900 return
-6910 mm$="indirectx":print mm$;
+6910 mm$="indirectx":print mm$
 6920 gosub 5800:rem getsym
 6930 ex$="x":gosub 5400:rem expect x
 6940 ex$=")":gosub 5400:rem expect )
@@ -186,8 +188,10 @@
 7000 rem * value *
 7010 if sy$="num" then gosub 5800:return:rem preserve num ???
 7020 ex$="label":gosub 5400:rem expect label
-7030 num=138: rem get value from label, nyi
-7040 return
+7030 i=lp
+7040 i=i-1:if i<0 then er$="label not found":goto 5450
+7050 if la$(i)=name$ then num=la(i):return
+7060 goto 7040
 
 9000 rem *** mnemonics ***
 9010 rem data "bcc","bcs","beq","bmi","bne","bpl","bvc","bvs","adc","and"
