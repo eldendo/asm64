@@ -8,16 +8,13 @@
 70 * do not remove or change header   *
 80 ************************************
 
-100" ; testing: print a '*'
-110" ;org $c000
-111" bcc
-112" lab
-115" test   asl 
-116"        lda test,x
-120"        lda # 42 ;a<-'*'
-130" test2  jsr $ffd2
-140"; test3  rts 
-150" end.
+100" ; testing: print '*'
+110" start lda #42; accu <- '*'
+120" loop  jsr $ffd2
+130"       jmp test
+135" test
+140" end.
+
 
 3999 rem ******************************************
 
@@ -29,10 +26,10 @@
 4050 print
 
 4100 rem *** settings ***
-4120 ea=2384:rem editor address of first quote in editor
-4130 nm=56:rem number of (pseudo)mnemonics
-4140 mm=13:rem number of memory modes
-4150 ls=3:rem number of labels
+4120 ea=2384:rem editor address (of first quote in editor)
+4130 ai=56:rem number(aantal) of (pseudo)instructies
+4140 am=13:rem number(aantal) of memory modes
+4150 al=5:rem number(aantal) of labels
 4160 lc=49152:rem default location counter ($c000)
 4290 rem *** end of settings ***
 
@@ -61,13 +58,14 @@
 5500 rem *** initialisation ***
 5510 print "initialising...";
 5515 if peek(ea)<>34 then er$="first quote not on expected address":goto 5450
-5520 dim mn$(nm-1),ta(nm-1,mm-1):rem list of mnemonics, table of instructions
-5530 for r=0 to nm-1
+5520 dim mn$(ai-1),ta(ai-1,am-1):rem list of mnemonics, table of instructions
+5530 for r=0 to ai-1
 5550 read mn$(r):op=r:print ".";
-5560 for k=0 to mm-1:read ta(r,k):next k
+5560 for k=0 to am-1:read ta(r,k):next k
 5570 next r
-5575 dim by(mm-1):for i = 0 to mm-1:read by(i):next:rem bytes/instruction
-5580 dim la$(ls-1),la(ls-1):lp=0:rem labels and labelpointer
+5575 dim by(am-1):for i = 0 to am-1:read by(i):next:rem bytes/instruction
+5577 dim mm$(am-1):for i = 0 to am-1:read mm$(i):next:rem mem modes
+5580 dim la$(al-1),la(al-1):lp=0:rem labels and labelpointer
 5585 print
 5590 return
 
@@ -108,7 +106,7 @@
 5970 if (ch$<"a" or ch$>"z") and (ch$<"0" or ch$>"9") then 6000
 5980 name$=name$+ch$:gosub 5600:rem getch
 5990 goto 5970
-6000 for i=0 to nm-1: rem test for mnemonics
+6000 for i=0 to ai-1: rem test for mnemonics
 6010 if mn$(i)=name$ then sy$="mnemonic":mn=i
 6020 next i
 6030 if name$="a" or name$="x" or name$="y" then sy$=name$
@@ -137,8 +135,8 @@
 6260 return
 
 6300 rem *** labeldef ***
-6310 print "labeldef found: ";name$
-6312 if lp>=ls then er$="max labels exceeded":goto 5450
+6310 print "labeldef found: ";name$;" <-";lc
+6312 if lp>=al then er$="max labels exceeded":goto 5450
 6315 la$(lp)=name$:la(lp)=lc:lp=lp+1
 6320 gosub 5800:rem getsym
 6330 if sy$=":" then gosub 5800:rem getsym
@@ -147,7 +145,7 @@
 6400 rem *** instruction ***
 6410 print "instruction found: ";name$;" ";
 6420 gosub 5800:rem getsym
-6430 if sy$="eol" then mm$="implied":print mm$:gosub 7100:return
+6430 if sy$="eol" then mm=11:mm$="implied":print mm$:gosub 7100:return
 6440 if sy$="#" then gosub 6600:gosub 7100:return:rem immediate
 6450 if sy$="num" or sy$="label" then gosub 6700:gosub 7100:return: rem direct
 6460 if sy$="(" then gosub 6800:gosub 7100:return:rem indirect
@@ -156,34 +154,35 @@
 6490 return
 
 6600 rem ** immediate **
-6610 mm$="immediate":print mm$;
+6610 mm=0:mm$="immediate":print mm$;
 6620 gosub 5800:rem getsym
 6625 gosub 7000:rem value
 6630 print num
 6640 return
 
 6700 rem ** direct **
-6710 mm$="direct":print mm$;
+6710 mm=5:mm$="direct":print mm$;
+6715 if mn<=7 then mm=12: rem rel
 6720 gosub 7000:print num:rem value
 6730 if sy$<> "," then return
 6740 gosub 5800:rem getsym
-6750 if sy$="x" then mm$="directx":print mm$:gosub 5800:return
+6750 if sy$="x" then mm=6:mm$="directx":print mm$:gosub 5800:return
 6760 ex$="y":gosub 5400:rem expect y
-6770 mm$="directy":print mm$
+6770 mm=7:mm$="directy":print mm$
 6780 return
 
 6800 rem ** indirect **
-6810 mm$="indirect":print mm$;
+6810 mm=8:mm$="indirect":print mm$;
 6820 gosub 5800:rem getsym
 6830 gosub 7000:print num:rem value
 6840 if sy$="," then 6910:rem indirectx
 6850 ex$=")":gosub 5400:rem expect )
 6860 if sy$ <> "," then return
-6870 mm$="indirecty":print mm$
+6870 mm=10:mm$="indirecty":print mm$
 6880 gosub 5800:rem getsym 
 6890 ex$="y":gosub 5400:rem expect y
 6900 return
-6910 mm$="indirectx":print mm$
+6910 mm=9:mm$="indirectx":print mm$
 6920 gosub 5800:rem getsym
 6930 ex$="x":gosub 5400:rem expect x
 6940 ex$=")":gosub 5400:rem expect )
@@ -193,13 +192,20 @@
 7010 if sy$="num" then gosub 5800:return:rem preserve num ???
 7020 ex$="label":gosub 5400:rem expect label
 7030 i=lp
-7040 i=i-1:if i<0 then er$="label not found":goto 5450
+7040 i=i-1:if i<0 then er$="label '"+name$+"' not found":goto 5450
 7050 if la$(i)=name$ then num=la(i):return
 7060 goto 7040
 
 7100 rem *** emit ***
-7110 print "emit";lc;" ";mn$(mn)
-7120 return
+7105 if ta(mn,mm)=-1 then er$="unknown instruction":goto 5450
+7110 print "emit at";lc;" ";mn$(mn);" ";mm$(mm);by(mm);"byte(s)"
+7120 hi=int(num/256):lo=num-hi*256
+7130 print ta(mn,mm);:poke lc,ta(mn,mm)
+7140 if by(mm)>1 then print lo;:poke lc+1,lo
+7150 if by(mm)>2 then print hi;"(=";num;")":poke lc+2,hi
+7151 print
+7160 lc=lc+by(mm)
+7170 return
 
 9000 rem *** mnemonics ***
 9010 rem data "bcc","bcs","beq","bmi","bne","bpl","bvc","bvs","adc","and"
@@ -268,11 +274,14 @@
 9750 data "txs",  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,154, -1
 9760 data "tya",  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,152, -1
 9800 rem  mnem   imm acc zp  zpx zpy abs abx aby ind inx iny imp rel
+9805 rem  mm       0   1   2   3   4   5   6   7   8   9  10  11  12
+
 9810 rem number of databytes:
 9820 data          2,  1,  2,  2,  2,  3,  3,  3,  3,  2,  2,  1,  2
+ 
 9830 rem memory modes
 9840 data "imm","acc","zp","zpx","zpy","abs","abx","aby"
-9850  data "ind","inx","iny","imp","rel"
+9850 data "ind","inx","iny","imp","rel"
 
 
 
