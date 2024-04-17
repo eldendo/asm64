@@ -1,6 +1,6 @@
 1 goto 4000
 10 ************************************
-20 * assembler for c64 v0.4           *
+20 * assembler for c64 2pass          *
 30 * (c)2024 by ir. marc dendooven    *
 40 * assembler starts at line 4000    *
 50 * assembly prog after this header  *
