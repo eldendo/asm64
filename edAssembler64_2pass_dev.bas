@@ -9,7 +9,7 @@
 80 ************************************
 
 100" ; it's full of stars !
-110" start  lda #42
+110" start  lda #42 ; asterisk
 120"        ldx #0
 125" loop   dex
 130"        sta $400,x
@@ -17,7 +17,9 @@
 150"        sta $600,x
 160"        sta $700,x 
 180"        bne loop
-190"        jmp exit
+185"        beq skip ; test forward branch
+187"        nop
+190" skip   jmp exit ; test forward jump
 191"        nop
 192"        nop
 195" exit   rts
@@ -34,6 +36,7 @@
 4050 print
 
 4100 rem *** settings ***
+4110 db=0:rem debug
 4120 fq=2384:rem addres of first quote in editor
 4130 ai=56:rem number(aantal) of (pseudo)instructies
 4140 am=13:rem number(aantal) of memory modes
@@ -45,13 +48,13 @@
 
 4300 gosub 5500:rem initialisation
 
-4310 pa=1:print "pass 1"
+4310 pa=1:print "pass 1":print
 4320 ea=fq:lc=dl:lp=0:rem editor address,location counter,label pointer
 4330 gosub 5600:rem getch
 4340 gosub 5800:rem getsym
 4350 if name$<>"end" then gosub 6200:goto 4350:rem line 
 4360 name$=""
-4370 pa=2:print "pass 2"
+4370 pa=2:print:print:print "pass 2":print
 4380 ea=fq:lc=dl:rem editor address,location counter
 4390 gosub 5600:rem getch
 4400 gosub 5800:rem getsym
@@ -80,7 +83,7 @@
 5575 dim by(am-1):for i = 0 to am-1:read by(i):next:rem bytes/instruction
 5577 dim mm$(am-1):for i = 0 to am-1:read mm$(i):next:rem mem modes
 5580 dim la$(al-1),la(al-1):rem labels
-5585 print
+5585 print:print
 5590 return
 
 5600 rem *** getch ***
@@ -90,7 +93,7 @@
 5636 if peek(ea)<>34 then print "error: quote expected":stop
 5640 ch$=chr$(ch)
 5645 if ch$="@" then stop:rem debug
-5650 rem print ch$; :rem print lookahead character 
+5650 print ch$; :rem print lookahead character 
 5660 return
 
 5670 rem ** check for quote **
@@ -140,17 +143,15 @@
 6199 rem ---------- parser ----------
 
 6200 rem *** line ***
-6205 rem print sy$
 6210 if sy$="label" then gosub 6300:rem labeldef
 6220 if sy$="mnemonic" then gosub 6400:rem instruction
-6230 if sy$<>"eol" then ex$="eol":goto 5400
-6240 rem gosub 7100:rem emit 
+6230 if sy$<>"eol" then ex$="eol":goto 5400 
 6250 gosub 5800:rem getsym
 6260 return
 
 6300 rem *** labeldef ***
 6305 if pa=2 then 6320
-6310 print "labeldef found: ";name$;" <-";lc
+6310 if db then print "labeldef found: ";name$;" <-";lc
 6312 if lp>=al then er$="max labels exceeded":goto 5450
 6315 la$(lp)=name$:la(lp)=lc:lp=lp+1
 6320 gosub 5800:rem getsym
@@ -158,65 +159,62 @@
 6340 return
 
 6400 rem *** instruction ***
-6410 print "instruction found: ";name$;" ";
 6420 gosub 5800:rem getsym
 6425 if mn<=7 then gosub 6500:gosub 7100:return:rem rel 
-6430 if sy$="eol" then mm=11:mm$="implied":print mm$:gosub 7100:return
+6430 if sy$="eol" then mm=11:gosub 7100:return
 6440 if sy$="#" then gosub 6600:gosub 7100:return:rem immediate
 6450 if sy$="num" or sy$="label" then gosub 6700:gosub 7100:return: rem direct
 6460 if sy$="(" then gosub 6800:gosub 7100:return:rem indirect
-6470 if sy$="a" then gosub 5800:mm$="accumulator":print mm$:gosub 7100:return
+6470 if sy$="a" then gosub 5800:gosub 7100:return
 6480 er$="not a valid operand":goto 5450:rem error
 6490 return
 
-6500 rem ** rel ** // add test num in range... 
-6510 mm=12:mm$="relative":print mm$;
-6520 if sy$="num" then print num:return
+6500 rem ** rel ** 
+6510 mm=12
+6520 if sy$="num" then return
 6530 gosub 7015
 6540 num=num-lc-2
-6545 if num<-128 or num>127 then er$="branch distance exceeded":goto 5450
-6550 print num
+6545 if pa=2 and (num<-128 or num>127) then er$="branch distance":goto 5450
 6560 return
 
 6600 rem ** immediate **
-6610 mm=0:mm$="immediate":print mm$;
+6610 mm=0
 6620 gosub 5800:rem getsym
 6625 gosub 7000:rem value
-6630 print num
 6640 return
 
 6700 rem ** direct **
-6710 mm=5:mm$="direct":print mm$;
-6720 gosub 7000:print num:rem value
+6710 mm=5
+6720 gosub 7000:rem value
 6725 if num<=255 then mm=2: rem ZP
 6730 if sy$<> "," then return
 6740 gosub 5800:rem getsym
-6750 if sy$="x" then mm=mm+1:mm$="directx":print mm$:gosub 5800:return
+6750 if sy$="x" then mm=mm+1:gosub 5800:return
 6760 ex$="y":gosub 5400:rem expect y
-6770 mm=mm+2:mm$="directy":print mm$
+6770 mm=mm+2
 6780 return
 
 6800 rem ** indirect **
-6810 mm=8:mm$="indirect":print mm$;
+6810 mm=8
 6820 gosub 5800:rem getsym
-6830 gosub 7000:print num:rem value
+6830 gosub 7000:rem value
 6840 if sy$="," then 6910:rem indirectx
 6850 ex$=")":gosub 5400:rem expect )
 6860 if sy$ <> "," then return
-6870 mm=10:mm$="indirecty":print mm$
+6870 mm=10
 6880 gosub 5800:rem getsym 
 6890 ex$="y":gosub 5400:rem expect y
 6900 return
-6910 mm=9:mm$="indirectx":print mm$
+6910 mm=9
 6920 gosub 5800:rem getsym
 6930 ex$="x":gosub 5400:rem expect x
 6940 ex$=")":gosub 5400:rem expect )
 6950 return
 
 7000 rem * value *
-7010 if sy$="num" then gosub 5800:return:rem preserve num ???
+7010 if sy$="num" then gosub 5800:return
 
-7015 rem * label * !!! extra labels in pass 2 worden niet gevonden gezien lp gereset is
+7015 rem * label *
 7020 ex$="label":gosub 5400:rem expect label
 7030 i=lp
 7040 i=i-1:if i<0 then 7070 
@@ -227,22 +225,14 @@
 
 7100 rem *** emit ***
 7105 if ta(mn,mm)=-1 then er$="unknown instruction":goto 5450
-7110 print "emit at";lc;" ";mn$(mn);" ";mm$(mm);by(mm);"byte(s)"
+7110 if db then print "emit at";lc;" ";mn$(mn);" ";mm$(mm);by(mm);"byte(s)"
 7120 hi=int(num/256):lo=num-hi*256
-7130 print ta(mn,mm);:poke lc,ta(mn,mm)
-7140 if by(mm)>1 then print lo;:poke lc+1,lo
-7150 if by(mm)>2 then print hi;"(=";num;")":poke lc+2,hi
-7151 print
+7130 poke lc,ta(mn,mm):if db then print ta(mn,mm);
+7140 if by(mm)>1 then poke lc+1,lo:if db then print lo;
+7150 if by(mm)>2 then poke lc+2,hi:if db then print hi;"(=";num;")"
+7151 if db then print
 7160 lc=lc+by(mm)
 7170 return
-
-9000 rem *** mnemonics ***
-9010 rem data "bcc","bcs","beq","bmi","bne","bpl","bvc","bvs","adc","and"
-9020 rem data "asl","bit","brk","clc","cld","cli","clv","cmp","cpx","cpy"
-9030 rem data "dec","dex","dey","eor","inc","inx","iny","jmp","jsr","lda"
-9040 rem data "ldx","ldy","lsr","nop","ora","pha","php","pla","plp","rol"
-9050 rem data "ror","rti","rts","sbc","sec","sed","sei","sta","stx","sty"
-9060 rem data "tax","tay","tsx","txa","txs","tya","org","db" ,"equ","end"
 
 9200 rem *** instruction table ***
 9205 rem  mnem   imm acc zp  zpx zpy abs abx aby ind inx iny imp rel
