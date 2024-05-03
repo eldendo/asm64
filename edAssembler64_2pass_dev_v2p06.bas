@@ -8,28 +8,17 @@
 70 * do not remove or change header   *
 80 ************************************
 
-100" ;reverse screen
-101"
-102" low  = $fb ;low  zeropage address 
-104" high = $fc ;high zeropage address
-105"
-106" org 49200
-110"            lda# 0
-115"            tay
-120"            sta low
-130"            lda# 4
-140"            sta high
-150" loop       lda# $80
-155"            eor (low),y
-160"            sta (low),y
-170"            iny
-180"            bne loop
-190"            inc high
-195"            lda high
-200"            cmp #8
-210"            bcc loop
-220"            rts
-230"            end.
+100" ; it's full of stars !
+110" start  lda# '*'
+120"        ldx# 0
+125" loop   dex
+130"        sta $400,x
+140"        sta $500,x
+150"        sta $600,x
+160"        sta $700,x 
+180"        bne loop
+190"        rts
+200"        end.
 
 
 3999 rem ******************************************
@@ -113,6 +102,7 @@
 5815 if ch$=";" then gosub 6150:rem skip comment
 5820 if ch$>="0" and ch$<="9" then 5900: rem number
 5830 if ch$>="a" and ch$<="z" then 5950: rem label or mnemonic
+5835 if ch$="'" then 6100: rem char
 5840 if ch$="$" then 6050: rem hex number
 5845 if ch=13 then sy$="eol":gosub 5600:return
 5850 sy$=ch$:gosub 5600:rem getch
@@ -140,7 +130,16 @@
 6065 gosub 5600:rem getch
 6070 if ch$>="0" and ch$<="9" then num=num*16+asc(ch$)-asc("0"):goto 6065
 6080 if ch$>="a" and ch$<="f" then num=num*16+asc(ch$)-asc("a")+10:goto 6065
-6100 return
+6090 return
+
+6100 rem ** char **
+6105 sy$="num"
+6110 gosub 5600:rem getch
+6115 num=asc(ch$)
+6120 gosub 5600:if ch$<>"'" then er$="quote expected":goto 5450
+6125 gosub 5600:rem getch
+6130 return 
+
 
 6150 rem ** skip comment **
 6160 gosub 5600: if ch<>13 then 6160:rem getch until eol
